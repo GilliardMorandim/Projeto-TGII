@@ -1,0 +1,153 @@
+# Esse script apresenta os resultados do exemplo da seção
+
+
+#Input dos dados 
+NF<-c(6.2,7.2,6.0,7,7.3,6.1,6.7,6.4,6.5,3.6,7.6,5,8.7,8.8,8.6)
+p1<-c(4.65,4.70,3.5,3.75,5.35,3.45,6.25,4.05,4,1.65,8.6,1.7,8.75,8.4,8.4)
+pf<-c(0,0,0,0,0,0,0,0,0,0,0,0,1,1,1)
+RP<-c(1,1,0,0,0,1,0,0,0,0,1,0,0,0,0)
+#Função para mensurar a redução da variancia, entrada 2 vetores e a variancia do nódulo pai
+REDUCAO_VARI<-function(x, y, vari_pai){
+  s1<-sqrt(var(x))
+  s2<-sqrt(var(y))
+  n<-as.numeric(length(x)+length(y))
+  n1<-as.numeric(length(x))
+  n2<-as.numeric(length(y))
+  s<-vari_pai - ((n1/n)*s1 + (n2/n)*s2)
+}
+#Criação do Data Frame
+x<-data.frame(NF,p1,pf,RP)
+x
+#residuos
+x$res1<-x$NF-mean(x$NF)
+x
+#Variância dos resíduos
+vari_p<-var(x$res1)
+vari_p
+###Primeiro candidato a ramificação
+no_pf1<-x[x$pf==0,5]
+no_pf2<-x[x$pf==1,5]
+s1<-sqrt(var(no_pf1))
+s2<-sqrt(var(no_pf2))
+n<-as.numeric(length(no_pf1)+length(no_pf2))
+n1<-as.numeric(length(no_pf1))
+n2<-as.numeric(length(no_pf2))
+s<-vari_p - ((n1/n)*s1 + (n2/n)*s2)
+s
+#PERFIL - Redução na variância de 1.039955
+no_pf1<-x[x$RP==0,5]
+no_pf2<-x[x$RP==1,5]
+s1<-sqrt(var(no_pf1))
+s2<-sqrt(var(no_pf2))
+n<-as.numeric(length(no_pf1)+length(no_pf2))
+n1<-as.numeric(length(no_pf1))
+n2<-as.numeric(length(no_pf2))
+s<-vari_p - ((n1/n)*s1 + (n2/n)*s2)
+s
+#RA PAR - Redução na variância de 0.5712552
+vet_p1<-seq(min(x$p1),max(x$p1),by=0.1)
+vet_p1
+rd_p1_vet<-rep(0,length(vet_p1))
+for (i in 1:length(vet_p1)){
+  xx<-x[x$p1<=vet_p1[i],5]
+  yy<-x[x$p1>vet_p1[i],5]
+  xx<-as.vector(xx)
+  rd_p1_vet[i]<-REDUCAO_VARI(xx,yy,vari_p)
+}
+rd_p1_vet
+max(rd_p1_vet[2:68])
+data.frame(vet_p1,rd_p1_vet)
+#Nota da p1 - Reduçao na variância de 1.006408
+#Primeira árvore - Primeira ramificação - Perfil 
+mean(x[x$pf==0,5])
+x[x$pf==1,5]
+x
+estima1<-((x$pf==1)*mean(x[x$pf==1,5]))+(x$pf==0)*(mean(x[x$pf==0,5]))
+estima1
+x<-data.frame(x,estima1)
+
+x$res2<-x$NF-mean(x$NF)-estima1
+x$res2
+
+#Segunda árvore do Boosting
+no_pf1<-x[x$pf==0,7]
+no_pf2<-x[x$pf==1,7]
+s1<-sqrt(var(no_pf1))
+s2<-sqrt(var(no_pf2))
+n<-as.numeric(length(no_pf1)+length(no_pf2))
+n1<-as.numeric(length(no_pf1))
+n2<-as.numeric(length(no_pf2))
+s<-vari_p - ((n1/n)*s1 + (n2/n)*s2)
+s
+#Perfil - Redução da variância - 1.039955
+
+no_pf1<-x[x$RP==0,7]
+no_pf2<-x[x$RP==1,7]
+s1<-sqrt(var(no_pf1))
+s2<-sqrt(var(no_pf2))
+n<-as.numeric(length(no_pf1)+length(no_pf2))
+n1<-as.numeric(length(no_pf1))
+n2<-as.numeric(length(no_pf2))
+s<-vari_p - ((n1/n)*s1 + (n2/n)*s2)
+s
+#RA PAR - Redução na variância - 0.9925947
+
+vet_p1<-seq(min(x$p1),max(x$p1),by=0.1)
+vet_p1
+rd_p1_vet<-rep(0,length(vet_p1))
+for (i in 1:length(vet_p1)){
+  xx<-x[x$p1<=vet_p1[i],7]
+  yy<-x[x$p1>vet_p1[i],7]
+  xx<-as.vector(xx)
+  rd_p1_vet[i]<-REDUCAO_VARI(xx,yy,vari_p)
+}
+rd_p1_vet
+max(rd_p1_vet[2:68])
+data.frame(vet_p1,rd_p1_vet)
+#P1 - Redução na variância - 1.365724
+x$res2
+x
+estima2<-(x$p1<=3.35)*mean(x[x$p1<=3.35,7])+(x$p1>3.35)*mean(x[x$p1>3.35,7])
+estima2
+x$NF
+x<-data.frame(x,estima2)
+x$Preditos<-mean(x$NF)+estima1+estima2
+x$Preditos
+plot(x$Preditos-x$NF)
+
+mean(x[x$p1<=3.35,7])
+mean(x[x$p1>3.35,7])
+y<-x$Preditos-x$NF
+plot(y[order(y)])
+mean(x[x$RP==0, 1])
+mean(x[x$RP==1, 1])
+mean(x[x$pf==0, 1])
+mean(x[x$pf==1, 1])
+plot(x$p1)
+mean(x[x$p1>=6, 1])
+mean(x[x$p1<6,1])
+plot(x$p1,x$NF)
+Plot(x$N)
+
+  library(ggplot2)
+
+# Scatterplot
+theme_set(theme_bw())  # pre-set the bw theme.
+g <- ggplot(x, aes(p1,NF))
+g + geom_jitter(width = .5, size=1) +
+  labs(y="Nota Final", 
+       x="Nota p1", 
+       title="Nota obtida na p1 x Nota final")
+
+x[x$p1<=3.35,9]
+x[x$p1>3.35,9]
+x
+x$res2
+x
+install.packages("xlsReadWrite")
+library(xlsReadWrite)
+write.xls(x, "C:/Users/euamo carnaval/Documents/") 
+x$res2
+x
+mean(x[x$pf==0,5])
+x

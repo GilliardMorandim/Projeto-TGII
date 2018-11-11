@@ -1,0 +1,428 @@
+---
+title: "TG II - Cartopster"
+author: "Samuel Nobukuni de Bello"
+date: "20 de setembro de 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup,warning=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+library(readr)
+library(InformationValue)
+library("dplyr")
+library(gbm)
+library(broman)
+lara <- brocolors("crayons")["Mango Tango"]
+azu <- brocolors("crayons")["Denim"]
+
+```
+
+###Fun??es pr?prias e carga da base
+```{r, warning=FALSE}
+cartao_orig_desenv <- read_csv("C:/Users/euamo carnaval/Desktop/Bases TG I/cartao_orig_desenv.csv")
+bd_cartao<-cartao_orig_desenv
+```
+
+###Percentual de maus / bons - chegagem de missings.
+```{r}
+table(bd_cartao$RESP_CA)
+sum(1*(is.na(bd_cartao$X203)))
+sum(1*(is.na(bd_cartao$X204)))
+sum(1*(is.na(bd_cartao$X205)))
+sum(1*(is.na(bd_cartao$X206)))
+sum(1*(is.na(bd_cartao$X207)))
+sum(1*(is.na(bd_cartao$X212))) 
+bd_cartao$RESP_CA<-1*(bd_cartao$RESP_CA=="mau")
+```
+
+###valores negativos - Outliers bem significativos.
+```{r}
+histogram(bd_cartao$X212, main="Histograma de x212",xlim=c(min(bd_cartao$X212),max(bd_cartao$X212)),xlab="x212")
+histogram(bd_cartao$X203, main="Histograma de X203",xlim=c(min(bd_cartao$X203),max(bd_cartao$X203)),xlab="X203")
+histogram(bd_cartao$X204, main="Histograma de X204",xlim=c(min(bd_cartao$X204),max(bd_cartao$X204)),xlab="X204")
+histogram(bd_cartao$X205, main="Histograma de X205",xlim=c(min(bd_cartao$X205),max(bd_cartao$X205)),xlab="X205")
+histogram(bd_cartao$X206, main="Histograma de X206",xlim=c(min(bd_cartao$X206),max(bd_cartao$X206)),xlab="X206")
+histogram(bd_cartao$X207, main="Histograma de X207",xlim=c(min(bd_cartao$X207),max(bd_cartao$X207)),xlab="X207")
+tables(bd_cartao$X206)
+
+t<-summary(bd_cartao$X212)
+View()
+var(bd_cartao$X212)
+quantiles <- quantile(bd_cartao$X203, c(.25, .5 ,.75))
+quantiles
+sum(bd_cartao[bd_cartao$X212 > quantiles[2],"RESP_CA"])/124 
+sum(bd_cartao[bd_cartao$X212 < quantiles[1],"RESP_CA"])/124 
+```
+
+### Vari?ncia alta, outlier influentes na parte debaixo e na parte de cima.
+```{r}
+histogram(bd_cartao$X203)
+boxplot(bd_cartao$X203)
+summary(bd_cartao$X203)
+var(bd_cartao$X203)
+quantiles <- quantile(bd_cartao$X203, c(.01, .99))
+quantiles
+sum(bd_cartao[bd_cartao$X203 > quantiles[2],"RESP_CA"])/nrow(bd_cartao[bd_cartao$X203 > quantiles[2],"RESP_CA"]) 
+sum(bd_cartao[bd_cartao$X203 < quantiles[1],"RESP_CA"])/nrow(bd_cartao[bd_cartao$X203 < quantiles[1],"RESP_CA"]) 
+```
+
+
+### Mesmo m?ximo que o de cima, var bem alta.
+```{r}
+hist(bd_cartao$X204)
+summary(bd_cartao$X204)
+boxplot(bd_cartao$X204)
+sum(bd_cartao$X204>=500)
+sum(bd_cartao$X204<=0)
+var(bd_cartao$X204)
+quantiles <- quantile(bd_cartao$X204, c(.01, .99))
+quantiles
+sum(bd_cartao[bd_cartao$X204 > quantiles[2],"RESP_CA"])/nrow(bd_cartao[bd_cartao$X204 > quantiles[2],"RESP_CA"]) 
+sum(bd_cartao[bd_cartao$X204 < quantiles[1],"RESP_CA"])/nrow(bd_cartao[bd_cartao$X204 < quantiles[1],"RESP_CA"]) 
+```
+
+
+
+###escala muito fora do comum, vari?ncia muito alta, altamente discriminat?ria.
+```{r}
+hist(bd_cartao$X205)
+summary(bd_cartao$X205)
+var(bd_cartao$X205)
+hist(as.double(bd_cartao$X205[bd_cartao$RESP_CA==1]))
+hist(as.double(bd_cartao$X205[bd_cartao$RESP_CA==0]))
+```
+
+###Vari?vel Qualitativa ordinal. 91% dos bons em zero, 57% dos maus em zero, ou seja 43% dos maus est?o acima de 0. Boa vari?vel.
+```{r}
+levels(as.factor(bd_cartao$X206))
+table(bd_cartao$X206)
+prop.table(table(bd_cartao$X206[bd_cartao$RESP_CA==1]))
+prop.table(table(bd_cartao$X206[bd_cartao$RESP_CA==0]))
+```
+
+###Qual ser? essa vari?vel?
+```{r}
+# levels(as.factor(bd_cartao$X207))
+hist(bd_cartao$X207)
+summary(bd_cartao$X207)
+var(bd_cartao$X207)
+```
+
+###var muito alta em 205 e muito baixa em 206
+###212 x corr fortes em 204 - 205 moderadas resto quase nula em 207
+###203 x moderadas com todas quase nula em 207
+###204 x moderadas com todas quase nula em 207
+###205 x quase nula em 207
+###206 x quase nula em 207
+```{r}
+diag(cov(bd_cartao[,-c(1,8)]))
+View(cor(bd_cartao[,-c(1,8)]))
+```
+###Pouca volumetria nos maus, preciso balancear?
+```{r}
+t<-table(bd_cartao$RESP_CA)
+t/sum(t)
+t
+
+```
+
+###Bivariada
+###Maus mais distribuidos, bons concentrados em zero. Muito boa essa vari?vel.
+```{r}
+levels(as.factor(bd_cartao$X206))
+t<-table(bd_cartao$X206,bd_cartao$RESP_CA)
+View(prop.table(t,1))
+```
+
+
+
+###mediana mais alta para maus, maior variabilidade da vari?vel ? para os maus, mexer nos outliers? 
+```{r}
+fun <- function(x){
+  quantiles <- quantile( x, c(.01, .99) )
+  x[ x < quantiles[1] ] <- quantiles[1]
+  x[ x > quantiles[2] ] <- quantiles[2]
+  x
+}
+boxplot(X212~RESP_CA, data=bd_cartao, col="seagreen4", xlab="Bom/Mau",
+        ylab="Medidas")
+x<-bd_cartao$X212
+boxplot(fun(x)~RESP_CA, data=bd_cartao, col=c(azu,lara), xlab="Bom/Mau",
+        ylab="Medidas",main="Vari?vel X212")
+
+```
+
+```{r}
+fun <- function(x){
+  quantiles <- quantile( x, c(.01, .99) )
+  x[ x < quantiles[1] ] <- quantiles[1]
+  x[ x > quantiles[2] ] <- quantiles[2]
+  x
+}
+boxplot(X203~RESP_CA, data=bd_cartao, col="seagreen4", xlab="Bom/Mau",
+        ylab="Medidas")
+x<-bd_cartao$X203
+boxplot(fun(x)~RESP_CA, data=bd_cartao, col=c(azu,lara), xlab="Bom/Mau",
+        ylab="Medidas",main="Vari?vel X203")
+
+```
+
+```{r}
+fun <- function(x){
+  quantiles <- quantile( x, c(.01, .99) )
+  x[ x < quantiles[1] ] <- quantiles[1]
+  x[ x > quantiles[2] ] <- quantiles[2]
+  x
+}
+boxplot(X204~RESP_CA, data=bd_cartao, col="seagreen4", xlab="Bom/Mau",
+        ylab="Medidas")
+x<-bd_cartao$X204
+
+boxplot(fun(x)~RESP_CA, data=bd_cartao, col=c(azu,lara), xlab="Bom/Mau",
+        ylab="Medidas",main="Vari?vel X204")
+
+```
+
+```{r}
+fun <- function(x){
+  quantiles <- quantile( x, c(0,.95) )
+  x[ x < quantiles[1] ] <- quantiles[1]
+  x[ x > quantiles[2] ] <- quantiles[2]
+  x
+}
+boxplot(X205~RESP_CA, data=bd_cartao, col="seagreen4", xlab="Bom/Mau",
+        ylab="Medidas")
+x<-bd_cartao$X205
+boxplot(fun(x)~RESP_CA, data=bd_cartao, col=c(azu,lara), xlab="Bom/Mau",
+        ylab="Medidas",main="Vari?vel X205")
+t<-summary(bd_cartao[bd_cartao$RESP_CA=="mau","X205"])
+View(t)
+summary(bd_cartao[bd_cartao$RESP_CA=="bom","X205"])
+
+```
+
+
+```{r}
+fun <- function(x){
+  quantiles <- quantile( x, c(.01, .99) )
+  x[ x < quantiles[1] ] <- quantiles[1]
+  x[ x > quantiles[2] ] <- quantiles[2]
+  x
+}
+boxplot(X207~RESP_CA, data=bd_cartao, col="seagreen4", xlab="Bom/Mau",
+        ylab="Medidas")
+x<-bd_cartao$X207
+boxplot(fun(x)~RESP_CA, data=bd_cartao, col=c(azu,lara), xlab="Bom/Mau",
+        ylab="Medidas",main="Vari?vel X207")
+
+fun <- function(x){
+  quantiles <- quantile( x, c(.01, .99) )
+  x[ x < quantiles[1] ] <- quantiles[1]
+  x[ x > quantiles[2] ] <- quantiles[2]
+  x
+}
+boxplot(X212~RESP_CA, data=bd_cartao, col="seagreen4", xlab="Bom/Mau",
+        ylab="Medidas")
+x<-bd_cartao$X212
+boxplot(fun(x)~RESP_CA, data=bd_cartao, col=c(azu,lara), xlab="Bom/Mau",
+        ylab="Medidas",main="Vari?vel X212")
+```
+
+### Dividir a Amostra - Hold-Out 15% 15% 70% - Teste 800 ?rvores, 86 caras em cada n?dulo no minimo (1% da base), profundidade =6, tx aprendizado de 8%
+```{r}
+amost <- sample(1:nrow(bd_cartao), 0.7*nrow(bd_cartao))
+table(as.factor(bd_cartao$RESP_CA))
+names(bd_cartao)
+train <- bd_cartao[amost,-1]
+test <- bd_cartao[-amost,-1]
+amost <- sample(1:nrow(test), 0.5*nrow(test))
+length(amost)
+vali<-test[amost,]
+test<-test[-amost,]
+prop.table(table(train$RESP_CA))
+prop.table(table(vali$RESP_CA))
+prop.table(table(test$RESP_CA))
+table(train$RESP_CA)
+table(vali$RESP_CA)
+table(test$RESP_CA)
+names(train)
+sum(train$RESP_CA[train$RESP_CA==1])
+nobsM<-round(.05*234)
+nt<-300
+gbmMod2 <- gbm::gbm(RESP_CA~., 
+                    data=train, 
+                    n.trees=nt, 
+                    distribution="bernoulli",
+                    interaction.depth = 6,
+                    n.minobsinnode = 2,
+                    shrinkage = 0.1)
+summary(gbmMod2)
+preds <- predict(gbmMod2, newdata = train, n.trees=nt)
+pi<-1/(1+exp(-preds))
+prev<-(pi>=0.5)*1
+table(prev,train$RESP_CA)
+ks_stat(train$RESP_CA, prev)
+t<-ks_stat(train$RESP_CA, prev, returnKSTable = T)
+t
+
+preds <- predict(gbmMod2, newdata = test, n.trees=nt)
+pi<-1/(1+exp(-preds))
+prev<-(pi>=0.5)*1
+table(prev,test$RESP_CA)
+ks_stat(test$RESP_CA, prev)
+t<-ks_stat(test$RESP_CA, prev, returnKSTable = T)
+t
+
+summary(gbmMod2)
+gbmMod2$var.names
+```
+
+
+###Ap?s sucessivos testes para tentar aproximar o KS do DES do KS da valida??o, optei por balancear a amostra
+```{r}
+set.seed(123123)
+bd_mau<-bd_cartao[bd_cartao$RESP_CA==1,]
+bd_bom<-bd_cartao[bd_cartao$RESP_CA==0,]
+amost <- sample(1:nrow(bd_bom), 337)
+bd_bom_amost<-bd_bom[amost,]
+amos_balan<-rbind(bd_bom_amost,bd_mau)
+nrow(amos_balan)
+amost <- sample(1:nrow(amos_balan), 0.7*nrow(amos_balan))
+train <- amos_balan[amost,-1]
+test <- amos_balan[-amost,-1]
+nrow(train)
+.70*nrow(amos_balan)
+
+gbmMod2 <- gbm::gbm(RESP_CA~., data=train, n.trees=30, distribution="bernoulli",interaction.depth = 6,n.minobsinnode = 20,shrinkage = 0.09)
+preds <- predict(gbmMod2, newdata = train, n.trees=30)
+pi<-1/(1+exp(-preds))
+prev<-(pi>=0.5)*1
+table(prev,train$RESP_CA)
+ks_stat(train$RESP_CA, prev)
+t<-ks_stat(train$RESP_CA, prev, returnKSTable = T)
+t
+
+nrow(test)
+preds <- predict(gbmMod2, newdata = test, n.trees=30)
+pi<-1/(1+exp(-preds))
+prev<-(pi>=0.5)*1
+table(prev,test$RESP_CA)
+ks_stat(test$RESP_CA, prev)
+t<-ks_stat(test$RESP_CA, prev, returnKSTable = T)
+t
+```
+
+###Fiz o Grid Search para ver se nao obtinha um modelo que n?o invertia, ordenando por diferen?a entre KS de DES e VALI
+```{r}
+
+hyper_grid <- expand.grid(
+  shrinkage = c(.05, .06, .08, .09, .1),
+  interaction.depth = c( 3, 4, 5, 6, 7, 8),
+  n.minobsinnode = c(5, 10),
+  bag.fraction = c(.65, 1),
+  ntre = c(80,100,150,200,250)
+)
+head(hyper_grid,30)
+nrow(hyper_grid)
+set.seed(123412)
+
+for(i in 1:nrow(hyper_grid)) {
+  gbm.tune <- gbm(formula = RESP_CA ~ .,
+    distribution = "bernoulli",
+    data = train,
+    n.trees = hyper_grid$ntre[i],
+    interaction.depth = hyper_grid$interaction.depth[i],
+    shrinkage = hyper_grid$shrinkage[i],
+    n.minobsinnode = hyper_grid$n.minobsinnode[i],
+    bag.fraction = hyper_grid$bag.fraction[i],
+    train.fraction = .75,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+  
+  preds <- predict(gbm.tune, newdata = train, n.trees=hyper_grid$ntre[i])
+  pi<-1/(1+exp(-preds))
+  hyper_grid$KS_des[i]<-ks_stat(train$RESP_CA, pi)
+
+  preds <- predict(gbm.tune, newdata = test, n.trees=hyper_grid$ntre[i])
+  pi<-1/(1+exp(-preds))
+  hyper_grid$KS_vali[i]<-ks_stat(test$RESP_CA, pi)
+  
+  hyper_grid$optimal_trees[i] <- which.min(gbm.tune$valid.error)
+  
+  hyper_grid$min_RMSE[i] <- sqrt(min(gbm.tune$valid.error))
+  
+  hyper_grid$DIFF_DES_VALI <- hyper_grid$KS_des[i] - hyper_grid$KS_vali[i]
+  
+  hyper_grid$id_modelo[i] <- paste("Modelo_intera_",i) 
+  
+}
+hyper_grid[i,]
+hyper_grid %>% 
+  dplyr::arrange(DIFF_DES_VALI) %>%
+  head(30)
+```
+
+###Ordenando por KS da Valida??o
+
+```{r}
+hyper_grid[i,]
+hyper_grid %>% 
+  dplyr::arrange(desc(KS_vali)) %>%
+  head(10)
+```
+
+
+###O quarto modelo ficou bem topster
+```{r}
+i=128
+set.seed(123412)
+hyper_grid[i,]
+gbm.tune <- gbm(formula = RESP_CA ~ .,
+    distribution = "bernoulli",
+    data = train,
+    n.trees = hyper_grid$ntre[i],
+    interaction.depth = hyper_grid$interaction.depth[i],
+    shrinkage = hyper_grid$shrinkage[i],
+    n.minobsinnode = hyper_grid$n.minobsinnode[i],
+    bag.fraction = hyper_grid$bag.fraction[i],
+    train.fraction = .75,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+  
+  
+  preds <- predict(gbm.tune, newdata = train, n.trees=hyper_grid$ntre[i])
+  pi<-1/(1+exp(-preds))
+  hyper_grid$KS_des[i]<-ks_stat(train$RESP_CA, pi)
+  ks_stat(train$RESP_CA, pi)
+  t<-ks_stat(train$RESP_CA, pi, returnKSTable = T)
+  plotROC(train$RESP_CA, pi)
+  View(t)
+  
+  preds <- predict(gbm.tune, newdata = test, n.trees=hyper_grid$ntre[i])
+  pi<-1/(1+exp(-preds))
+  hyper_grid$KS_vali[i]<-ks_stat(test$RESP_CA, pi)
+  ks_stat(test$RESP_CA, pi)
+  t<-ks_stat(test$RESP_CA, pi, returnKSTable = T)
+  t
+  plotROC(test$RESP_CA, pi)
+  summary(
+  gbm.tune, 
+  cBars = 6,
+  method = relative.influence, # also can use permutation.test.gbm
+  las = 2
+  
+  )
+  plot(gbm.tune$train.error)
+  plot(gbm.tune$valid.error)
+  t<-gbm.tune$c.splits
+  gbm.tune$var.levels
+  gbm.tune$m
+```
+
+
+

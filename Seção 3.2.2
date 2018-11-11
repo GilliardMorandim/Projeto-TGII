@@ -1,0 +1,219 @@
+logittt<-function(x){
+  1/(1+exp(-x))
+}
+# exemplo de GBM para classifica??o ---------------------------------------
+system('shutdown -s -t 1800')
+
+x<-classific_ex
+
+x$tipo_lente<-(x$tipo_lente == 2) + (x$tipo_lente == 1)
+x$tipo_lente<-(x$tipo_lente-1)*(-1)
+
+?table
+table(x$tipo_lente)/24
+table(x$idade)/24
+table(x$presc_espetaculo)/24
+table(x$astigmat)/24
+table(x$prod_lagri)/24
+
+table(x$tipo_lente,x$idade)
+
+t<-table(x$idade,x$tipo_lente)
+prop.table(t,1)
+
+t<-table(x$presc_espetaculo,x$tipo_lente)
+prop.table(t,1)
+
+t<-table(x$astigmat,x$tipo_lente)
+prop.table(t,1)
+
+t<-table(x$prod_lagri,x$tipo_lente)
+prop.table(t,1)
+
+#valor inicial
+p<-table(x$tipo_lente)
+
+#(Idade do paciente, prescri??o oft?lmica, 
+#indicadora de astigmatismo e taxa de produ??o de l?grimas) 
+
+ch_ini<-log(p[2]/p[1])
+ch_ini
+
+x$grad_neg<-x$tipo_lente-(1/(1+exp(-ch_ini)))
+x$f0<-ch_ini
+
+var_pai<-sqrt(var(x$grad_neg))
+names(x)
+#-0.03998713
+var_idade<-sqrt(var(x[x$idade==1,7]))
+var_pai-var_idade
+
+#-0.02301381
+var_idade<-sqrt(var(x[x$idade==2,7]))
+var_pai-var_idade
+
+#0.03162531 MAIOR?
+var_idade<-sqrt(var(x[x$idade==3,7]))
+var_pai-var_idade
+
+#-0.0203933
+var_presc_espetaculo<-sqrt(var(x[x$presc_espetaculo==1,7]))
+var_pai-var_presc_espetaculo
+
+#0.002169391
+var_presc_espetaculo<-sqrt(var(x[x$presc_espetaculo==2,7]))
+var_pai-var_presc_espetaculo
+
+#-0.0203933
+var_astigmat<-sqrt(var(x[x$astigmat==1,7]))
+var_pai-var_astigmat
+
+#0.002169391
+var_astigmat<-sqrt(var(x[x$astigmat==2,7]))
+var_pai-var_astigmat
+
+#0.4945354
+var_prod_lagri<-sqrt(var(x[x$prod_lagri==1,7]))
+var_pai-var_prod_lagri
+
+#0.04226834
+var_prod_lagri<-sqrt(var(x[x$prod_lagri==2,7]))
+var_pai-var_prod_lagri
+
+
+
+####QUEBRA otima em prod_lagri==1
+names(x)
+
+x$pi<-1/(1+exp(-x$f0))
+
+sum(t(x[x$prod_lagri==1,6]-x[x$prod_lagri==1,9]))/sum(t(x[x$prod_lagri==1,9]*(1-x[x$prod_lagri==1,9])))
+
+sum(t(x[x$prod_lagri==2,6]-x[x$prod_lagri==2,9]))/sum(t(x[x$prod_lagri==2,9]*(1-x[x$prod_lagri==2,9])))
+
+
+1/(1+exp(-(1.6+.5108256)))
+1/(1+exp(-(-1.6+.5108256)))
+
+# f = f0 + 1.6 (se prod_lagri igual a 1) - 1.6 (se prod_lagri igual a 2) =
+#   = .5108256 -1.957615 (se prod_lagri igual a 1) + 1.043792 (se prod_lagri igual a 2).
+#estima a probabilidade com 1/(1+exp(-f))
+
+x$f1<- .5108256 + 1.6*(x$prod_lagri==1) - 1.6*(x$prod_lagri==2)
+x$prob_1<- logittt(x$f1)
+x$grad_neg_2<-x$tipo_lente-x$prob_1
+
+var_pai<-sqrt(var(x$grad_neg_2))
+names(x)
+#0.1254282
+var_idade<-sqrt(var(x[x$idade==1,12]))
+var_pai-var_idade
+
+# -0.01478743
+var_idade<-sqrt(var(x[x$idade==2,12]))
+var_pai-var_idade
+
+# -0.06755814
+var_idade<-sqrt(var(x[x$idade==3,12]))
+var_pai-var_idade
+
+# 0.02461858
+var_presc_espetaculo<-sqrt(var(x[x$presc_espetaculo==1,12]))
+var_pai-var_presc_espetaculo
+
+#-0.03066841
+var_presc_espetaculo<-sqrt(var(x[x$presc_espetaculo==2,12]))
+var_pai-var_presc_espetaculo
+
+#0.02461858
+var_astigmat<-sqrt(var(x[x$astigmat==1,12]))
+var_pai-var_astigmat
+
+# -0.03066841
+var_astigmat<-sqrt(var(x[x$astigmat==2,12]))
+var_pai-var_astigmat
+
+####SEGUNDA quebra ?tima x[x$idade==3,12]) idade =3 
+names(x)
+x$pi<-1/(1+exp(-x$f1))
+
+sum(t(x[x$idade==1,6]-x[x$idade==1,11]))/sum(t(x[x$idade==1,11]*(1-x[x$idade==1,11])))
+
+sum(t(x[x$idade!=1,6]-x[x$idade!=1,11]))/sum(t(x[x$idade!=1,11]*(1-x[x$idade!=1,11])))
+
+
+
+# f = .5108256 + 1.6 I(se prod_lagri igual a 1) - 1.6 I(se prod_lagri igual a 2) 
+#              -0.5047254 I(se idade = 1)) + 0.8121813 I(se idade = 1)).
+
+x$f2<- x$f1 -0.5047254*(x$idade==1) + 0.8121813*(x$idade!=1) 
+x$prob_2<- logittt(x$f2)
+x$grad_neg_3<-x$tipo_lente-x$prob_2
+plot(x$grad_neg_3)
+
+var_pai<-sqrt(var(x$grad_neg_3))
+names(x)
+
+#-0.04456094
+var_idade<-sqrt(var(x[x$idade==2,15]))
+var_pai-var_idade
+
+# -0.0725732
+var_idade<-sqrt(var(x[x$idade==3,15]))
+var_pai-var_idade
+
+# 0.006767029 ----=----
+var_presc_espetaculo<-sqrt(var(x[x$presc_espetaculo==1,15]))
+var_pai-var_presc_espetaculo
+
+#-0.01293278
+var_presc_espetaculo<-sqrt(var(x[x$presc_espetaculo==2,15]))
+var_pai-var_presc_espetaculo
+
+#0.006767029
+var_astigmat<-sqrt(var(x[x$astigmat==1,15]))
+var_pai-var_astigmat
+
+#- 0.01405632
+var_astigmat<-sqrt(var(x[x$astigmat==2,15]))
+var_pai-var_astigmat
+
+####SEGUNDA quebra ?tima x[x$idade==3,12]) idade =3 
+names(x)
+x$pi<-1/(1+exp(-x$f2))
+
+sum(t(x[x$presc_espetaculo==1,6]-x[x$presc_espetaculo==1,14]))/sum(t(x[x$presc_espetaculo==1,14]*(1-x[x$presc_espetaculo==1,14])))
+
+sum(t(x[x$presc_espetaculo!=1,6]-x[x$presc_espetaculo!=1,14]))/sum(t(x[x$presc_espetaculo!=1,14]*(1-x[x$presc_espetaculo!=1,14])))
+
+
+
+
+# f = .5108256 + 1.6 I(se prod_lagri igual a 1) - 1.6 I(se prod_lagri diff a 2) 
+#              - 1.33018 I(se idade = 1))       + 0.5950981 I(se idade != 1))
+#              -0.3022603 I(se presc espet = 1) + 0.2745027 I(se presc espet != 1)
+.
+
+x$f3<- x$f2 - 0.3022603*(x$presc_espetaculo==1) + 0.2745027*(x$presc_espetaculo!=1) 
+x$prob_3 <- logittt(x$f3)
+x$grad_neg_4<-x$tipo_lente-x$prob_3
+
+
+
+plot(x$grad_neg_4)
+mean(x$f0)
+
+plot(x$grad_neg_2)
+mean(x$f1)
+
+plot(x$grad_neg_3)
+mean(x$f2)
+
+plot(x$grad_neg_)
+mean(x$f3)
+
+(x$prob_3>.5)*1-x$tipo_lente
+3/24
+x[24,]
+x[20,]
+x[18,]
